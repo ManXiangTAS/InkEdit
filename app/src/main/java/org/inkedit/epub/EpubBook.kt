@@ -53,14 +53,43 @@ class EpubBook private constructor(private val contents: LinkedHashMap<String, B
             return book
         }
         private fun parse(data: ByteArray): Document {
+            // Android's XML parser does not implement every JAXP feature URI.
+            // Never fail a normal EPUB just because an optional feature is unsupported.
+            // Instead, explicitly reject DTDs and block external entity resolution.
+            val xmlText = when {
+                data.size >= 2 && data[0] == 0xfe.toByte() && data[1] == 0xff.toByte() ->
+                    String(data, Charsets.UTF_16BE)
+                data.size >= 2 && data[0] == 0xff.toByte() && data[1] == 0xfe.toByte() ->
+                    String(data, Charsets.UTF_16LE)
+                else -> String(data, Charsets.UTF_8)
+            }
+            require(!xmlText.contains("<!DOCTYPE", ignoreCase = true)) {
+                "不支持带 DOCTYPE 的 XML 文件（安全限制）"
+            }
             val factory = DocumentBuilderFactory.newInstance()
             factory.isNamespaceAware = true
-            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
-            factory.setFeature("http://xml.org/sax/features/external-general-entities", false)
-            factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false)
-            factory.isXIncludeAware = false
+            for ((name, enabled) in listOf(
+                "http://apache.org/xml/features/disallow-doctype-decl" to true,
+                "http://xml.org/sax/features/external-general-entities" to false,
+                "http://xml.org/sax/features/external-parameter-entities" to false
+            )) {
+                try {
+                    factory.setFeature(name, enabled)
+                } catch (_: javax.xml.parsers.ParserConfigurationException) {
+                    // Unsupported on some Android releases (e.g. Expat).
+                }
+            }
+            try {
+                factory.isXIncludeAware = false
+            } catch (_: UnsupportedOperationException) {
+                // Android does not support XInclude.
+            }
             factory.setExpandEntityReferences(false)
-            return factory.newDocumentBuilder().parse(ByteArrayInputStream(data))
+            val builder = factory.newDocumentBuilder()
+            builder.setEntityResolver { _, _ ->
+                throw org.xml.sax.SAXException("外部 XML 实体被禁止")
+            }
+            return builder.parse(ByteArrayInputStream(data))
         }
         private fun field(doc: Document, local: String): String =
             doc.getElementsByTagNameNS("http://purl.org/dc/elements/1.1/", local).item(0)?.textContent.orEmpty()
