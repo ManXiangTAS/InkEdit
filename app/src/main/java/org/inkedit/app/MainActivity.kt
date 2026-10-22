@@ -68,7 +68,7 @@ class MainActivity : ComponentActivity() {
 
                 Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("InkEdit · 墨编", style = MaterialTheme.typography.headlineMedium)
-                    Text("离线 EPUB 编辑器 · v0.1")
+                    Text("离线 EPUB 编辑器 · v0.1.1")
                     Button(onClick = { open.launch(arrayOf("application/epub+zip", "application/zip", "*/*")) }) { Text("打开 EPUB") }
                     Text(status)
                     if (book != null) {
