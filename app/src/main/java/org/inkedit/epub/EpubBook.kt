@@ -179,14 +179,23 @@ class EpubBook private constructor(private val contents: LinkedHashMap<String, B
                     val doc = parse(xhtml)
                     val head = doc.getElementsByTagNameNS("http://www.w3.org/1999/xhtml", "head").item(0) as? Element ?: continue
                     val links = head.getElementsByTagNameNS("*", "link")
-                    if ((0 until links.length).none { (links.item(it) as Element).getAttribute("href") == "inkedit-layout.css" }) {
+                    val chapterDir = uri.substringBeforeLast('/', "").split('/').filter { it.isNotBlank() }
+                    val cssPath = relative("inkedit-layout.css").split('/').filter { it.isNotBlank() }
+                    val commonCount = chapterDir.zip(cssPath).takeWhile { (a, b) -> a == b }.size
+                    val cssHref = "../".repeat(chapterDir.size - commonCount) +
+                        cssPath.drop(commonCount).joinToString("/")
+                    val linked = (0 until links.length)
+                        .mapNotNull { links.item(it) as? Element }
+                        .firstOrNull { it.getAttribute("href").substringAfterLast('/') == "inkedit-layout.css" }
+                    if (linked != null) {
+                        linked.setAttribute("href", cssHref)
+                    } else {
                         val link = doc.createElementNS("http://www.w3.org/1999/xhtml", "link")
                         link.setAttribute("rel", "stylesheet")
-                        val pathToCss = java.net.URI(relative(uri.substringAfterLast('/'))).resolve("inkedit-layout.css")
-                        link.setAttribute("href", "inkedit-layout.css")
+                        link.setAttribute("href", cssHref)
                         head.appendChild(link)
-                        files[uri] = encode(doc)
                     }
+                    files[uri] = encode(doc)
                 } catch (_: Exception) { /* keep original XHTML if it cannot be parsed */ }
             }
         }
