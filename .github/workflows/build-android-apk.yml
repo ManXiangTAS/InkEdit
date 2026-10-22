@@ -20,8 +20,12 @@ jobs:
       - name: Install Android SDK platform
         run: |
           echo "ANDROID_HOME=$ANDROID_HOME"
-          sdkmanager --version
-          sdkmanager --install 'platforms;android-36' 'build-tools;35.0.0'
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then
+            SDKMANAGER="$ANDROID_HOME/cmdline-tools/16.0/bin/sdkmanager"
+          fi
+          "$SDKMANAGER" --version
+          "$SDKMANAGER" --install 'platforms;android-36' 'build-tools;35.0.0'
       - name: Build debug APK
         run: gradle --stacktrace :app:assembleDebug
       - uses: actions/upload-artifact@v4
